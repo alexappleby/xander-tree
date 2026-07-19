@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial; margin: 0; padding: 20px; background: #1a1a1a; color: #fff; }
+    button { background: #4CAF50; color: white; padding: 15px 30px; font-size: 18px; 
+             border: none; border-radius: 8px; width: 100%; margin: 10px 0; }
+    input { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; box-sizing: border-box; }
+    #preview { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>📦 Inventory Scanner</h2>
+  
+  <input type="file" id="camera" accept="image/*">
+  <img id="preview" style="display:none;">
+  
+<input type="text" id="label" placeholder="Item name" value="">
+<input type="number" id="price" step="0.01" placeholder="Price $" value="">
+<input type="text" id="notes" placeholder="Notes" value="">
+  
+  <button onclick="processItem()">✅ Add to Inventory</button>
+  <div id="status"></div>
+  
+  <script>
+    var imageData = null;
+    
+    document.getElementById('camera').onchange = function(e) {
+      var file = e.target.files[0];
+      var reader = new FileReader();
+      reader.onload = function(event) {
+        imageData = event.target.result;
+        document.getElementById('preview').src = imageData;
+        document.getElementById('preview').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    };
+    
+    function processItem() {
+      document.getElementById('status').innerHTML = '⏳ Processing...';
+      
+      var dataToSend = {
+        image: imageData || 'no-image',
+        label: document.getElementById('label').value,
+        price: document.getElementById('price').value,
+        notes: document.getElementById('notes').value
+      };
+      
+      console.log('Sending data:', dataToSend);
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            document.getElementById('status').innerHTML = 
+              '✅ Added to row ' + result.row + 
+              '<br>Label: ' + result.label +
+              '<br>Price: ' + result.value;
+          } else {
+            document.getElementById('status').innerHTML = '❌ Error: ' + result.error;
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('status').innerHTML = '❌ Failed: ' + error.message;
+        })
+        .processInventory(dataToSend);
+    }
+  </script>
+</body>
+</html>
