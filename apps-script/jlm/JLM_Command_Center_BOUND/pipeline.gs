@@ -5,7 +5,9 @@
  *
  * What it does (run from the "JLM Pipeline" menu, manual):
  *   1. Scans the Drive catalog root for audio masters not yet processed
- *      (skips DUPLICATE- , preview/video, and archive folders).
+ *      (skips DUPLICATE- , preview/video, and archive folders; skips any
+ *      folder at any depth flagged "EMPTY - " or "DUPLICATE - " from the
+ *      2026-07-19 catalog cleanup).
  *   2. For each new master, matches it to a canonical song row by
  *      normalized SONG-FOLDER NAME (never appends one row per file).
  *      Creates exactly one new row if no match; blocks if ambiguous.
@@ -33,6 +35,11 @@ const PIPE = {
   // Folders under the catalog root to skip during the scan
   SKIP_FOLDERS: ["_Quarantine", "_Press Kit", "Z-Archive (Duplicates)",
                  "Duplicate tracks", "Artwork", "JLM_Release_Package.zip"],
+
+  // Any folder (album OR song, at any depth) whose name matches this is skipped.
+  // Catches the "EMPTY - " / "DUPLICATE - " prefixes applied during the
+  // 2026-07-19 Drive catalog cleanup (flagged duplicate/empty album + song folders).
+  SKIP_FOLDER_PATTERN: /^\s*(EMPTY|DUPLICATE)\s*-/i,
 
   MAX_PER_RUN: 3,                 // Apps Script 6-min limit: process a few per run
   MAX_AUDIO_BYTES: 24 * 1024 * 1024,
@@ -152,6 +159,7 @@ function jlmScanForNewAudio_(folder, processedIds, out, depth) {
   if (depth > 5) return;
   const fname = folder.getName();
   if (depth > 0 && PIPE.SKIP_FOLDERS.indexOf(fname) !== -1) return;
+  if (PIPE.SKIP_FOLDER_PATTERN.test(fname)) return; // EMPTY - / DUPLICATE - flagged folder, any depth
 
   // Does this folder directly contain a qualifying master audio?
   const best = jlmFindBestAudioInFolder_(folder);
@@ -169,6 +177,10 @@ function jlmScanForNewAudio_(folder, processedIds, out, depth) {
   while (subs.hasNext()) {
     jlmScanForNewAudio_(subs.next(), processedIds, out, depth + 1);
   }
+}
+
+function jlmIsFlaggedFolder_(name) {
+  return PIPE.SKIP_FOLDER_PATTERN.test(String(name || ""));
 }
 
 function jlmFindBestAudioInFolder_(folder) {
@@ -205,7 +217,11 @@ function jlmCollectAudio_(folder, candidates, depth) {
     candidates.push({ file: file, score: score });
   }
   const subs = folder.getFolders();
-  while (subs.hasNext()) jlmCollectAudio_(subs.next(), candidates, depth + 1);
+  while (subs.hasNext()) {
+    const sub = subs.next();
+    if (jlmIsFlaggedFolder_(sub.getName())) continue; // skip EMPTY - / DUPLICATE - flagged folders
+    jlmCollectAudio_(sub, candidates, depth + 1);
+  }
 }
 
 function jlmIsSupportedAudio_(lowerName) {

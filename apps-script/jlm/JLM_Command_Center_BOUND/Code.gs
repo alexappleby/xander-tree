@@ -83,9 +83,9 @@ const JLM_CONFIG = {
  * Adds custom menu when the spreadsheet opens.
  */
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu("JLM AI Tools")
-    .createMenu("Pipeline")
+  const ui = SpreadsheetApp.getUi();
+
+  const pipelineMenu = ui.createMenu("Pipeline")
     .addItem("1. Install / Repair AI Columns", "installJlmAiEngine")
     .addSeparator()
     .addItem("Generate Lyrics + Metadata for Selected Song", "generateLyricsMetadataForSelectedSong")
@@ -93,10 +93,14 @@ function onOpen() {
     .addItem("Process Catalog Metadata Queue", "processCatalogMetadataQueue")
     .addSeparator()
     .addItem("Rebuild Whole Catalog Queue", "rebuildMetadataLyricsQueue")
-    .addItem("Clear Completed Queue Items", "clearCompletedQueueItems")
-    .addToUi();
-}
+    .addItem("Clear Completed Queue Items", "clearCompletedQueueItems");
 
+  ui.createMenu("JLM AI Tools")
+    .addSubMenu(pipelineMenu)
+    .addToUi();
+
+  onOpenPipeline_();
+}
 
 /**
  * Run this first.

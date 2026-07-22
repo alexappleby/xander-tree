@@ -27,51 +27,25 @@ disaster recovery.
 - **Bound vs standalone**: `JLM_Pipeline/` is a plain-text copy kept in Drive as
   a separate file (not the live code). `JLM_Command_Center_BOUND/` is the actual
   live project bound to the spreadsheet — it's the one that runs when you use
-  the "JLM AI Tools" menu in the sheet. As of 2026-07-21 these have **drifted**:
-  the bound `pipeline.gs` is missing the folder-skip fix below. See "Known drift"
-  before assuming either copy reflects production behavior.
-- **Catalog cleanup (2026-07-19)**: the pipeline scanner was updated to skip any
-  folder prefixed `EMPTY - ` or `DUPLICATE - ` (the flags applied during the
-  Drive catalog cleanup). See the `SKIP_FOLDER_PATTERN` constant in
-  `JLM_Pipeline/JLM_Pipeline.gs`. This fix has **not** been applied to the live
-  bound script (`JLM_Command_Center_BOUND/pipeline.gs`) yet — see "Known drift".
-- **`Javascript.gs` is dead code.** Both functions in
-  `JLM_Command_Center_BOUND/Javascript.gs` (`getCloudHash`, `generateMetadataManifest`)
-  are unreferenced anywhere else in the project — a placeholder Cloud Function URL
-  was never deployed. Kept for reference only; safe to delete from the live
-  project if unused.
-
-## Known drift (as of 2026-07-21)
-
-The live bound `pipeline.gs` does **not** have the `SKIP_FOLDER_PATTERN` fix that
-`JLM_Pipeline/JLM_Pipeline.gs` has. To bring it in sync, open the JLM_Command_Center
-sheet → Extensions → Apps Script → `pipeline.gs`, and apply:
-
-1. Add to the `PIPE` config object:
-   ```js
-   SKIP_FOLDER_PATTERN: /^\s*(EMPTY|DUPLICATE)\s*-/i,
-   ```
-2. Add a helper function:
-   ```js
-   function jlmIsFlaggedFolder_(name) {
-     return PIPE.SKIP_FOLDER_PATTERN.test(String(name || ""));
-   }
-   ```
-3. In the folder-scan function, skip flagged folders early:
-   ```js
-   if (PIPE.SKIP_FOLDER_PATTERN.test(fname)) return; // EMPTY - / DUPLICATE - flagged folder, any depth
-   ```
-4. In the recursive subfolder walk, skip flagged folders before recursing:
-   ```js
-   while (subs.hasNext()) {
-     const sub = subs.next();
-     if (jlmIsFlaggedFolder_(sub.getName())) continue; // skip EMPTY - / DUPLICATE - flagged folders
-     jlmCollectAudio_(sub, candidates, depth + 1);
-   }
-   ```
-
-Full reference diff: compare `JLM_Command_Center_BOUND/pipeline.gs` (live, pre-fix)
-against `JLM_Pipeline/JLM_Pipeline.gs` (updated, post-fix) in this repo.
+  the "JLM AI Tools" and "JLM Pipeline" menus in the sheet.
+- **Catalog cleanup (2026-07-19)**: the pipeline scanner skips any folder
+  prefixed `EMPTY - ` or `DUPLICATE - ` (the flags applied during the Drive
+  catalog cleanup). See the `SKIP_FOLDER_PATTERN` constant in
+  `pipeline.gs` (both `JLM_Pipeline/` and `JLM_Command_Center_BOUND/` copies
+  are in sync as of 2026-07-21).
+- **Menu bug fixed (2026-07-21)**: the original `onOpen()` in
+  `JLM_Command_Center_BOUND/Code.gs` chained `.createMenu("JLM AI Tools").createMenu("Pipeline")`,
+  which is invalid — Apps Script's menu builder doesn't support calling
+  `createMenu()` on the result of another `createMenu()`. This threw
+  `TypeError: ...createMenu is not a function` on every sheet load, meaning
+  the menus never actually rendered. Fixed using `.addSubMenu()` to properly
+  nest "Pipeline" inside "JLM AI Tools", and wired in a call to
+  `onOpenPipeline_()` so the separate "JLM Pipeline" top-level menu
+  (Run Pipeline / Reset Queue / Show Log) also renders on load.
+- **`Javascript.gs` removed (2026-07-21)**: it contained two unreferenced
+  scratch functions (`getCloudHash`, `generateMetadataManifest`) pointing at
+  a Cloud Function URL that was never deployed. Deleted from the live project
+  as dead code; no longer present in this backup.
 
 ## Restore
 
